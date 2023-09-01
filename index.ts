@@ -136,10 +136,10 @@ async function processResponse(actions: any[]) {
         return action.text;
       case 'new':
         console.log('New object', action);
-        const { name, color, shape, transform } = action;
-        const asset_3d_id = asset3dIdsByName[shape];
+        const { name, color, model, transform } = action;
+        const asset_3d_id = asset3dIdsByName[model];
         if (!asset_3d_id) {
-          console.error('Unknown shape', shape);
+          console.error('Unknown model', model);
           break;
         }
         const object = await bot.spawnObject({

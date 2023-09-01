@@ -67,7 +67,7 @@ function objectsToDescription(
       return {
         objectId: id,
         name,
-        shape: asset3dNamesById[asset_type] || 'n/a',
+        model: asset3dNamesById[asset_type] || 'n/a',
         transform,
       };
     })
