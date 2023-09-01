@@ -16,6 +16,7 @@ const privateKey = process.env['BOT_SDK_PRIVATE_KEY'];
 
 let initialDataReceived = false;
 const objects: Record<string, posbus.ObjectDefinition> = {};
+const objectsData: Record<string, posbus.ObjectData> = {};
 let myTransform: posbus.TransformNoScale = {
   position: { x: 0, y: 0, z: 0 },
   rotation: { x: 0, y: 0, z: 0 },
@@ -77,6 +78,10 @@ const config: BotConfig = {
     console.log('Object moved!', objectId, transform);
     objects[objectId].transform = transform;
   },
+  onObjectData(objectId, data) {
+    console.log('Object data!', objectId, data);
+    objectsData[objectId] = data;
+  },
 };
 
 const bot = new Bot(config);
@@ -113,6 +118,7 @@ async function startMainLoop() {
         const resp = await sendToOpenAI(
           message,
           objects,
+          objectsData,
           myTransform,
           asset3dNamesById
         );
@@ -134,6 +140,7 @@ async function processResponse(actions: any[]) {
     switch (action.type) {
       case 'text':
         return action.text;
+
       case 'new':
         console.log('New object', action);
         const { name, color, model, transform } = action;
@@ -148,12 +155,26 @@ async function processResponse(actions: any[]) {
           asset_3d_id,
         });
         console.log('Spawned object', object);
-        // TODO color
+        if (color) {
+          await bot.setObjectColor(object.id, color);
+        }
         break;
+
+      case 'edit':
+        console.log('Edit object', action);
+        if (action.color) {
+          await bot.setObjectColor(action.objectId, action.color);
+        }
+        if (action.name) {
+          await bot.setObjectName(action.objectId, action.name);
+        }
+        break;
+
       case 'remove':
         console.log('Remove object', action);
         bot.removeObject(action.objectId);
         break;
+
       case 'transform':
         console.log('Transform object', action);
         await bot.requestObjectLock(action.objectId);
@@ -164,6 +185,7 @@ async function processResponse(actions: any[]) {
         bot.transformObject(action.objectId, newTransform);
         bot.requestObjectUnlock(action.objectId);
         break;
+
       default:
         console.log('Unknown action', action);
     }

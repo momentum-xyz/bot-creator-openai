@@ -14,6 +14,7 @@ const history: OpenAI.Chat.Completions.CreateChatCompletionRequestMessage[] =
 export const sendToOpenAI = async (
   message: string,
   objects: Record<string, posbus.ObjectDefinition>,
+  objectsData: Record<string, posbus.ObjectData>,
   myTransform: posbus.TransformNoScale,
   asset3dNamesById: Record<string, string>
 ): Promise<string> => {
@@ -29,7 +30,7 @@ export const sendToOpenAI = async (
         content:
           systemContent +
           '\nCurrent objects are:' +
-          objectsToDescription(objects, asset3dNamesById) +
+          objectsToDescription(objects, objectsData, asset3dNamesById) +
           '\nMy current transform is ' +
           JSON.stringify(myTransform),
       },
@@ -60,16 +61,27 @@ export const sendToOpenAI = async (
 
 function objectsToDescription(
   objects: Record<string, posbus.ObjectDefinition>,
+  objectsData: Record<string, posbus.ObjectData>,
   asset3dNamesById: Record<string, string>
 ) {
   return JSON.stringify(
     Object.values(objects).map(({ id, asset_type, transform, name }) => {
-      return {
+      const objInfo: any = {
         objectId: id,
         name,
         model: asset3dNamesById[asset_type] || 'n/a',
         transform,
       };
+      const color = objectsData[id]?.entries?.string?.object_color;
+      if (color) {
+        objInfo.color = color;
+      }
+      const texture = objectsData[id]?.entries?.texture?.object_texture;
+      if (texture) {
+        objInfo.texture = texture;
+      }
+
+      return objInfo;
     })
   );
 }
