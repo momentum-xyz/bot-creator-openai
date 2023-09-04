@@ -14,7 +14,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@momentum-xyz/bot-sdk": "^0.0.1-alpha.13",
+    "@momentum-xyz/bot-sdk": "^0.0.1-alpha.14",
     "openai": "^4.3.1"
   },
   "devDependencies": {
