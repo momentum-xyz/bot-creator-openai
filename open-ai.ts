@@ -16,7 +16,7 @@ export const sendToOpenAI = async (
   objects: Record<string, posbus.ObjectDefinition>,
   objectsData: Record<string, posbus.ObjectData>,
   myTransform: posbus.TransformNoScale,
-  asset3dNamesById: Record<string, string>
+  supportedAssets: { asset3dId: string; name: string; category: string }[]
 ): Promise<string> => {
   history.push({
     role: 'user',
@@ -30,7 +30,9 @@ export const sendToOpenAI = async (
         content:
           systemContent +
           '\nCurrent objects are:' +
-          objectsToDescription(objects, objectsData, asset3dNamesById) +
+          objectsToDescription(objects, objectsData, supportedAssets) +
+          '\nSupported assets/models are:' +
+          JSON.stringify(supportedAssets) +
           '\nMy current transform is ' +
           JSON.stringify(myTransform),
       },
@@ -62,14 +64,18 @@ export const sendToOpenAI = async (
 function objectsToDescription(
   objects: Record<string, posbus.ObjectDefinition>,
   objectsData: Record<string, posbus.ObjectData>,
-  asset3dNamesById: Record<string, string>
+  supportedAssets: { asset3dId: string; name: string; category: string }[]
 ) {
+  const asset3dNamesById = Object.fromEntries(
+    supportedAssets.map(({ asset3dId, name }) => [asset3dId, name])
+  );
   return JSON.stringify(
     Object.values(objects).map(({ id, asset_type, transform, name }) => {
       const objInfo: any = {
         objectId: id,
         name,
         model: asset3dNamesById[asset_type] || 'n/a',
+        asset3dId: asset_type,
         transform,
       };
       const color = objectsData[id]?.entries?.string?.object_color;

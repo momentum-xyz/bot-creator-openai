@@ -3,6 +3,7 @@ import {
   BotConfig,
   getAuthTokenWithPrivateKey,
   posbus,
+  Asset3d,
 } from '@momentum-xyz/bot-sdk';
 import { promptUser } from './chat';
 import { sendToOpenAI } from './open-ai';
@@ -22,27 +23,10 @@ let myTransform: posbus.TransformNoScale = {
   rotation: { x: 0, y: 0, z: 0 },
 };
 
-// TODO load from DB
-const asset3dNamesById = {
-  'a55f9ca7-4b45-692e-204f-e37ed9dc3d78': 'bucky',
-  '97daa12f-9b2e-536d-7851-3b0837175e4c': 'disc',
-  '839b21db-52ff-45ce-7484-fd1b59ebb087': 'dodeca',
-  'dad4e8a4-cdcc-4174-9d77-f7e849bba352': 'icosa',
-  'a1f144de-b21a-d1e9-0635-6eb250927326': 'octo',
-  '313a97cc-fe1b-39bb-56e7-516d213cc23d': 'sphere',
-  '6e8fec1c-ff95-df66-1375-e312f6447b3d': 'torus',
-  'eea924c0-6e33-393f-e06e-e6631e8860e9': 'capsule',
-  '8a7e55f5-934d-8ebf-17bb-39e2d8d9bfa1': 'cone',
-  '5b5bd872-0328-e38c-1b54-bf2bfa70fc85': 'cube',
-  '46d923ad-21ff-276d-c3c4-ead2212bcb02': 'cylinder',
-  '418c4963-623a-391c-795d-e6080be11899': 'quad',
-  '2dc7df8e-a34a-829c-e3ca-b73bfe99faf0': 'orb',
-  'de99ac0e-0ba0-6446-9263-46d3f6c854e5': 'teapot',
-};
-const asset3dIdsByName = Object.fromEntries(
-  Object.entries(asset3dNamesById).map(([id, name]) => [name, id])
-);
-const supportedAssetNames = Object.keys(asset3dNamesById);
+const asset3dNamesById: Record<string, string> = {};
+let supportedAssets: { asset3dId: string; name: string; category: string }[] =
+  [];
+
 const defaultTransform = {
   position: { x: 0, y: 0, z: 0 },
   rotation: { x: 0, y: 0, z: 0 },
@@ -103,6 +87,23 @@ if (privateKey) {
 }
 
 async function startMainLoop() {
+  supportedAssets = await Promise.all([
+    bot.getSupportedAssets3d('basic'),
+    bot.getSupportedAssets3d('custom'),
+  ])
+    .then((results) => results.flat())
+    .then((assets) =>
+      assets.map(({ id, meta: { name, category } }) => ({
+        asset3dId: id,
+        name,
+        category,
+      }))
+    );
+  console.log('Supported assets', supportedAssets);
+  for (const asset of supportedAssets) {
+    asset3dNamesById[asset.asset3dId] = asset.name;
+  }
+
   let prompt = 'Enter message to send or type "exit" to exit the chat';
   let message = '';
   while (true) {
@@ -120,7 +121,7 @@ async function startMainLoop() {
           objects,
           objectsData,
           myTransform,
-          asset3dNamesById
+          supportedAssets
         );
 
         const commands = JSON.parse(resp);
@@ -143,16 +144,16 @@ async function processResponse(actions: any[]) {
 
       case 'new':
         console.log('New object', action);
-        const { name, color, model, transform } = action;
-        const asset_3d_id = asset3dIdsByName[model];
-        if (!asset_3d_id) {
-          console.error('Unknown model', model);
+        const { name, color, asset3dId, transform } = action;
+
+        if (!asset3dNamesById[asset3dId]) {
+          console.error('Unknown asset3dId', asset3dId);
           break;
         }
         const object = await bot.spawnObject({
           name,
           transform: { ...defaultTransform, ...transform },
-          asset_3d_id,
+          asset_3d_id: asset3dId,
         });
         console.log('Spawned object', object);
         if (color) {
