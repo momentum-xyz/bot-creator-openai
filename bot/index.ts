@@ -7,6 +7,10 @@ import {
 } from '@momentum-xyz/bot-sdk';
 import { promptUser } from './chat';
 import { sendToOpenAI } from './open-ai';
+import { startServer } from './server';
+import { EventEmitter } from 'events';
+
+const eventEmitter = new EventEmitter();
 
 // TODO change worldId to your world id!
 const worldId = '00000000-0000-8000-8000-000000000027';
@@ -86,6 +90,14 @@ if (privateKey) {
   bot.connect();
 }
 
+const waitForRequest = () =>
+  new Promise((resolve) => {
+    eventEmitter.once('prompt', (prompt) => {
+      console.log('Received prompt', prompt);
+      resolve(prompt);
+    });
+  });
+
 async function startMainLoop() {
   supportedAssets = await Promise.all([
     bot.getSupportedAssets3d('basic'),
@@ -104,11 +116,29 @@ async function startMainLoop() {
     asset3dNamesById[asset.asset3dId] = asset.name;
   }
 
+  startServer({
+    port: 4243,
+    onRequest: async (prompt) => {
+      console.log('Received prompt request');
+      eventEmitter.emit('prompt', prompt);
+
+      return new Promise((resolve) => {
+        eventEmitter.once('response', (response) => {
+          console.log('Received response', response);
+          resolve(response);
+        });
+      });
+    },
+  });
+
   let prompt = 'Enter message to send or type "exit" to exit the chat';
   let message = '';
   while (true) {
     try {
-      message = await promptUser(prompt);
+      message = (await Promise.race([
+        promptUser(prompt),
+        waitForRequest(),
+      ])) as string;
     } catch (err) {
       console.log('Exiting chat...');
       process.exit(0);
@@ -128,6 +158,7 @@ async function startMainLoop() {
         prompt = await processResponse(
           Array.isArray(commands) ? commands : [commands]
         );
+        eventEmitter.emit('response', prompt);
       }
     } catch (err: any) {
       console.error('Error', err);

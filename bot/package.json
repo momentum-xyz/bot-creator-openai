@@ -1,0 +1,31 @@
+{
+  "name": "bot",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.ts",
+  "type": "commonjs",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "ts-node index.ts"
+  },
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@momentum-xyz/bot-sdk": "^0.0.1-alpha.14",
+    "@types/express": "^4.17.17",
+    "@types/ws": "^8.5.5",
+    "express": "^4.18.2",
+    "openai": "^4.3.1",
+    "ws": "^8.13.0"
+  },
+  "devDependencies": {
+    "@tsconfig/node20": "^1.0.2",
+    "@types/node": "^20.3.3",
+    "ts-node": "^10.9.1",
+    "tslib": "^2.6.0",
+    "typescript": "^5.1.6"
+  }
+}
