@@ -2,14 +2,18 @@ import OpenAI from 'openai';
 import { systemContent } from './open-ai-setup';
 import { posbus } from '@momentum-xyz/bot-sdk';
 
-const { OPENAI_API_KEY } = process.env;
+export type ChatMessage =
+  OpenAI.Chat.Completions.CreateChatCompletionRequestMessage;
 
-const openai = new OpenAI({
-  apiKey: OPENAI_API_KEY,
-});
+let openai: OpenAI;
 
-const history: OpenAI.Chat.Completions.CreateChatCompletionRequestMessage[] =
-  [];
+export const initClient = (apiKey: string) => {
+  openai = new OpenAI({
+    apiKey,
+  });
+};
+
+const history: ChatMessage[] = [];
 
 export const sendToOpenAI = async (
   message: string,
@@ -60,6 +64,8 @@ export const sendToOpenAI = async (
   }
   throw new Error('Invalid response from OpenAI');
 };
+
+export const getHistory = () => history;
 
 function objectsToDescription(
   objects: Record<string, posbus.ObjectDefinition>,

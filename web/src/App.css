@@ -15,6 +15,12 @@
   flex: 1 0 auto;
   overflow: auto;
   max-height: calc(100vh - 10em);
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1em;
 }
 
 .App-body,

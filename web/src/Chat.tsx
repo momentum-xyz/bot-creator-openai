@@ -1,4 +1,4 @@
-import React, { FC, useState } from 'react';
+import React, { FC, useEffect, useRef, useState } from 'react';
 import {
   TextField,
   List,
@@ -9,40 +9,72 @@ import {
   LinearProgress,
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
-
-export interface Message {
-  content: string;
-  sender: 'me' | 'server';
-}
+import { Message } from './types';
 
 interface ChatHistoryProps {
   messages: Message[];
 }
 
+const contentToText = (content: string) => {
+  try {
+    console.log('contentToText:', content);
+    const parsed = JSON.parse(content);
+    if (typeof parsed === 'string') {
+      return parsed;
+    }
+    if (Array.isArray(parsed)) {
+      return parsed
+        .filter((it) => it.type === 'text')
+        .map((it) => it.text)
+        .join('\n');
+    }
+    if (typeof parsed === 'object' && parsed.text) {
+      return parsed.text;
+    }
+  } catch (err) {
+    // console.log('contentToText err', err);
+  }
+  return content;
+};
+
 export const ChatHistory: FC<ChatHistoryProps> = ({ messages }) => {
+  const refLast = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (refLast.current) {
+      refLast.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
   return (
     <List>
-      {messages.map((msg, index) => (
-        <ListItem
-          key={index}
-          style={{
-            justifyContent: msg.sender === 'me' ? 'flex-end' : 'flex-start',
-          }}
-        >
-          <ListItemText
-            primary={msg.content}
+      {messages.map((msg, index) => {
+        const isUser = msg.role === 'user';
+        const text = contentToText(msg.content);
+
+        return (
+          <ListItem
+            key={index}
             style={{
-              background: msg.sender === 'me' ? '#e0f7fa' : '#ffecb3',
-              padding: '8px 16px',
-              borderRadius: '16px',
-              maxWidth: '70%',
-              display: 'inline-block',
-              // preserve newline
-              whiteSpace: 'pre-wrap',
+              justifyContent: isUser ? 'flex-end' : 'flex-start',
             }}
-          />
-        </ListItem>
-      ))}
+          >
+            <ListItemText
+              primary={text}
+              style={{
+                background: isUser ? '#e0f7fa' : '#ffecb3',
+                padding: '8px 16px',
+                borderRadius: '16px',
+                maxWidth: '70%',
+                display: 'inline-block',
+                // preserve newline
+                whiteSpace: 'pre-wrap',
+              }}
+            />
+          </ListItem>
+        );
+      })}
+      <span ref={refLast} />
     </List>
   );
 };
@@ -73,7 +105,6 @@ export const ChatInput = ({ onSend }: ChatInputProps) => {
   };
   return (
     <form onSubmit={handleSubmit} className="chat-input-panel">
-      {isLoading && <LinearProgress sx={{ margin: '1em 0' }} />}
       <TextField
         fullWidth
         variant="outlined"
@@ -92,6 +123,7 @@ export const ChatInput = ({ onSend }: ChatInputProps) => {
           ),
         }}
       />
+      {isLoading && <LinearProgress sx={{ margin: '1em 0' }} />}
     </form>
   );
 };

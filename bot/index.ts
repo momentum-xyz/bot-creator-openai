@@ -3,10 +3,15 @@ import {
   BotConfig,
   getAuthTokenWithPrivateKey,
   posbus,
-  Asset3d,
+  fetchAuthChallenge,
+  getAuthTokenWithSignature,
 } from '@momentum-xyz/bot-sdk';
 import { promptUser } from './chat';
-import { sendToOpenAI } from './open-ai';
+import {
+  getHistory,
+  initClient as initOpenAIClient,
+  sendToOpenAI,
+} from './open-ai';
 import { startServer } from './server';
 import { EventEmitter } from 'events';
 
@@ -17,7 +22,7 @@ const worldId = '00000000-0000-8000-8000-000000000027';
 const backendUrl = 'http://localhost:4000';
 
 // Set private key from environment variable if you want to connect as User, otherwise connect as Guest
-const privateKey = process.env['BOT_SDK_PRIVATE_KEY'];
+const { OPENAI_API_KEY, BOT_SDK_PRIVATE_KEY: privateKey } = process.env;
 
 let initialDataReceived = false;
 const objects: Record<string, posbus.ObjectDefinition> = {};
@@ -73,7 +78,6 @@ const config: BotConfig = {
 };
 
 const bot = new Bot(config);
-
 if (privateKey) {
   console.log('Private key passed. Get the auth token...');
   getAuthTokenWithPrivateKey(privateKey, { backendUrl })
@@ -86,9 +90,57 @@ if (privateKey) {
       process.exit(1);
     });
 } else {
-  console.log('No private key passed. Connect as guest...');
-  bot.connect();
+  console.log('No private key passed. Wait for sign-in');
 }
+
+if (OPENAI_API_KEY) {
+  initOpenAIClient(OPENAI_API_KEY);
+}
+
+let userAccountAddress: string | undefined;
+
+startServer({
+  port: 4243,
+  onRequest: async (prompt) => {
+    console.log('Received prompt request');
+    eventEmitter.emit('prompt', prompt);
+
+    return new Promise((resolve) => {
+      eventEmitter.once('response', (response) => {
+        console.log('Received response', response);
+        resolve(response);
+      });
+    });
+  },
+  onClientConnected: async (account) => {
+    console.log('Client connected', account);
+    userAccountAddress = account;
+    const connectedToPosbus = bot.isConnected;
+    let challenge: string | undefined;
+    if (!connectedToPosbus) {
+      challenge = await fetchAuthChallenge(account, { backendUrl });
+    }
+    return {
+      connectedToPosbus,
+      challenge,
+      hasOpenAIKey: !!OPENAI_API_KEY,
+      conversation: getHistory(),
+    };
+  },
+  onSignIn: async (signature) => {
+    console.log('Client signed in', signature);
+    const token = await getAuthTokenWithSignature(
+      signature,
+      userAccountAddress!,
+      { backendUrl }
+    );
+    await bot.connect(token);
+  },
+  onOpenAIKey: async (apiKey) => {
+    console.log('Client set OpenAI key', apiKey);
+    initOpenAIClient(apiKey);
+  },
+});
 
 const waitForRequest = () =>
   new Promise((resolve) => {
@@ -115,21 +167,6 @@ async function startMainLoop() {
   for (const asset of supportedAssets) {
     asset3dNamesById[asset.asset3dId] = asset.name;
   }
-
-  startServer({
-    port: 4243,
-    onRequest: async (prompt) => {
-      console.log('Received prompt request');
-      eventEmitter.emit('prompt', prompt);
-
-      return new Promise((resolve) => {
-        eventEmitter.once('response', (response) => {
-          console.log('Received response', response);
-          resolve(response);
-        });
-      });
-    },
-  });
 
   let prompt = 'Enter message to send or type "exit" to exit the chat';
   let message = '';
@@ -163,6 +200,7 @@ async function startMainLoop() {
     } catch (err: any) {
       console.error('Error', err);
       prompt = 'Error: ' + err.message;
+      eventEmitter.emit('response', err.message);
     }
   }
 }
